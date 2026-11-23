@@ -1,0 +1,101 @@
+
+name: Esteira de Producao CI-CD
+
+on:
+  pull_request:
+    branches:
+      - main
+
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+
+  validar:
+    name: Validar projeto (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18, 20]
+
+    steps:
+      - name: Baixar codigo
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Verificar arquivo principal
+        run: |
+          if [ ! -f index.html ]; then
+            echo "ERRO: index.html nao encontrado na raiz!"
+            exit 1
+          fi
+
+      - name: Executar HTMLHint
+        run: npm run lint
+
+      - name: Verificar tamanho, comentarios e links
+        run: npm run validate
+
+  publicar:
+    name: Publicar no GitHub Pages
+    runs-on: ubuntu-latest
+    needs: validar
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Baixar codigo aprovado
+        uses: actions/checkout@v4
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Preparar arquivos para publicacao
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+
+      - name: Publicar site
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  notificar:
+    name: Notificar falha
+    runs-on: ubuntu-latest
+    needs: validar
+    if: failure()
+
+    steps:
+      - name: Enviar notificacao
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          if [ -n "$DISCORD_WEBHOOK" ]; then
+            curl -H "Content-Type: application/json" \
+              -d '{"content":"Atenção! A esteira CI/CD do portfólio apresentou uma falha. Verifique a aba Actions do GitHub."}' \
+              "$DISCORD_WEBHOOK"
+          else
+            echo "Webhook nao configurado. Consulte as notificacoes do GitHub."
+          fi

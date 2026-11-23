@@ -1,0 +1,13 @@
+
+{
+  "name": "portfolio-profissional",
+  "version": "1.0.0",
+  "description": "Portfolio profissional com CI/CD",
+  "scripts": {
+    "lint": "htmlhint index.html",
+    "validate": "node scripts/validar.js"
+  },
+  "devDependencies": {
+    "htmlhint": "1.1.4"
+  }
+}
